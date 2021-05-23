@@ -1,14 +1,13 @@
 enclave
 {
+	from "sgx_pthread.edl" import *;
+    from "sgx_tstdc.edl" import *;
+
 	trusted
 	{
-		/*These are ECALL defines.*/
-		public int ecall_test([in, size=message_len]const char *message,
-			size_t message_len);
+		public void ecall_matprod([in, size=total_len]const int* a, [in, size=total_len]const int* b, [in, out, size=total_len]int* res, int total_len, int len);
 	};
 	untrusted
 	{
-		/*These are OCALL defines.*/
-		void ocall_print([in, string]const char *str);
 	};
 };

@@ -125,7 +125,9 @@ int initialize_enclave()
 	return 0;
 }
 
+const int len = 1000;
 
+int A[len * len], B[len * len], C[len * len], localC[len * len];
 
 
 int main()
@@ -140,14 +142,33 @@ int main()
 
 
 	/* start ECALL */
-	const char *message = "Hello Enclave.";
-	size_t message_len = strlen(message);
-	int retval = -9999;
+
+	// Prepare matrix
+	for(int i = 0; i < len; ++i) {
+		for(int j = 0; j < len; ++j) {
+			A[i * len + j] = i * 713612 + j;
+			B[i * len + j] = (i * i + j) * i;
+		}
+	}
+
+	int ibl = 16;
+	for(int ib = 0; ib < len; ib += ibl) {
+		for(int jb = 0; jb  < len; jb += ibl) {
+			for(int kb = 0; kb  < len; kb += ibl) {
+				for (int i = ib; i < ib + ibl && i < len; ++i) {
+					for (int j = jb; j < jb + ibl && j < len; ++j) {
+						for (int k = kb; k < kb + ibl && k < len; ++k) {
+							localC[len * i + j] += A[len * i + k] * B[len * k + j];
+						}
+					}
+				}
+			}
+		}
+	}
 
 	std::cout << "Execute ECALL.\n" << std::endl;
 
-	sgx_status_t status = ecall_test(global_eid, &retval,
-		message, message_len);
+	sgx_status_t status = ecall_matprod(global_eid, (int*)A, (int*)B, (int*)C, len*len * sizeof(int), len);
 
 	if(status != SGX_SUCCESS)
 	{
@@ -161,17 +182,28 @@ int main()
 		sgx_error_print(status);
 	}
 
-
-	/* print ECALL result */
-	std::cout << "\nReturned integer from ECALL is: " << retval << std::endl;
-	std::cout << std::endl;
-
-
-
 	/* Destruct the enclave */
 	sgx_destroy_enclave(global_eid);
 
 	std::cout << "Whole operations have been executed correctly." << std::endl;
+
+	bool differs = false;
+	for(int i = 0; i < len; ++i) {
+		for(int j = 0; j < len; ++j) {
+			if (localC[i * len + j] != C[i * len + j]) {
+				std::cout << "Calculated matrix differed!" << std::endl;
+				differs = true;
+
+				goto BREAK;
+			}
+		}
+	}
+	BREAK:
+
+	if (!differs) {
+		std::cout << "Calculated matrix matched!" << std::endl;
+	}
+
 
 	return 0;
 }
