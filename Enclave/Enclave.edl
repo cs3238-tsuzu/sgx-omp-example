@@ -5,9 +5,12 @@ enclave
 
 	trusted
 	{
-		public void ecall_matprod([in, size=total_len]const int* a, [in, size=total_len]const int* b, [in, out, size=total_len]int* res, int total_len, int len);
+		public void ecall_matprod([user_check]const int* a, [user_check]const int* b, [user_check]int* res, int total_len, int len);
 	};
 	untrusted
 	{
+		void start_timer();
+
+		void stop_timer();
 	};
 };

@@ -4,11 +4,14 @@
 #include "Enclave_u.h"
 #include <sgx_urts.h>
 #include "error_print.h"
+#include <time.h>
+#include <chrono>
 
 
 
 sgx_enclave_id_t global_eid = 0;
-
+decltype(std::chrono::system_clock::now()) start;
+decltype(std::chrono::system_clock::now() - std::chrono::system_clock::now()) duration;
 
 
 /* OCALL implementations */
@@ -20,6 +23,14 @@ void ocall_print(const char* str)
 	return;
 }
 
+
+void start_timer() {
+	start = std::chrono::system_clock::now();
+}
+
+void stop_timer() {
+	duration = std::chrono::system_clock::now() - start;
+}
 
 
 /* Enclave initialization function */
@@ -151,13 +162,18 @@ int main()
 		}
 	}
 
+	start_timer();
+
+	int ib, jb, kb, i, j, k;
 	int ibl = 16;
-	for(int ib = 0; ib < len; ib += ibl) {
-		for(int jb = 0; jb  < len; jb += ibl) {
-			for(int kb = 0; kb  < len; kb += ibl) {
-				for (int i = ib; i < ib + ibl && i < len; ++i) {
-					for (int j = jb; j < jb + ibl && j < len; ++j) {
-						for (int k = kb; k < kb + ibl && k < len; ++k) {
+
+// #pragma omp parallel for private(jb, kb, i, j, k)
+	for(ib = 0; ib < len; ib += ibl) {
+		for(jb = 0; jb  < len; jb += ibl) {
+			for(kb = 0; kb  < len; kb += ibl) {
+				for (i = ib; i < ib + ibl && i < len; ++i) {
+					for (j = jb; j < jb + ibl && j < len; ++j) {
+						for (k = kb; k < kb + ibl && k < len; ++k) {
 							localC[len * i + j] += A[len * i + k] * B[len * k + j];
 						}
 					}
@@ -165,6 +181,10 @@ int main()
 			}
 		}
 	}
+
+	stop_timer();
+
+	std::cout << "time in non-secure world: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << std::endl;
 
 	std::cout << "Execute ECALL.\n" << std::endl;
 
@@ -203,6 +223,8 @@ int main()
 	if (!differs) {
 		std::cout << "Calculated matrix matched!" << std::endl;
 	}
+
+	std::cout << "time in secure world: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << std::endl;
 
 
 	return 0;
